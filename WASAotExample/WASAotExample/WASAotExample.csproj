@@ -1,15 +1,31 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
-    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
-    <RootNamespace>WASAotExample</RootNamespace>
+    <TargetFramework>net9.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.22000.0</TargetPlatformMinVersion>
+    <RootNamespace>WASAotSample</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Platforms>x86;x64;ARM64</Platforms>
-    <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <UseWinUI>true</UseWinUI>
     <Nullable>enable</Nullable>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!--  独立 MSIX 打包  -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <!--  为使用 dotnet build 命令行命令而需要设置 EnableMsixTooling 以解决编译链造成的 bug  -->
+    <!--  https://github.com/microsoft/WindowsAppSDK/issues/3939#issuecomment-1793743107  -->
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <!--  WAS 的许多组件实现了泛型 WinRT 接口，比如 ItemsControls (ListView/GridView/FontIconExtension/等)  -->
+    <!--  ‘System.Collections.Generic.List’ 需要生成 unsafe 的代码以确保 AOT 兼容 WinRT ABI  -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!--  部分第三方库如 CommunityToolkit.Mvvm 需要使用到 filed 关键字及 partital property 以生成代码  -->
+    <LangVersion>preview</LangVersion>
   </PropertyGroup>
+  
+  <ItemGroup>
+    <!--  由 Microsoft.WindowsAppSDK 引入的传递依赖包，避免 WebView2 "1.0.2651.64" 的 AOT 编译警告  -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2849.39" />
+  </ItemGroup>
 
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
