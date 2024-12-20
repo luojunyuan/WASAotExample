@@ -1,7 +1,9 @@
-using Microsoft.UI.Xaml;
+ï»¿using Microsoft.UI.Xaml;
+using System.Diagnostics;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using WinUIEx;
+using WinUIEx.Messaging;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -30,22 +32,64 @@ namespace WASFramelessSample
             var winManager = WindowManager.Get(this);
             winManager.Width = winManager.Height = 220;
 
-            // 1. µÚÒ»ÖÖ·½·¨¼ÆËãÊó±êÒÆ¶¯´°¿ÚÎ»ÖÃ
-            // Content Ö»ÓĞ¾ßÓĞÔªËØ£¨³ıÁË transparent Íâ£©²¢ÇÒ²»»á±»ÍÌµô°´ÏÂÊÂ¼şµÄ²Å»á´¥·¢
+            // 1. ç¬¬ä¸€ç§æ–¹æ³•è®¡ç®—é¼ æ ‡ç§»åŠ¨çª—å£ä½ç½®
+            // Content åªæœ‰å…·æœ‰å…ƒç´ ï¼ˆé™¤äº† transparent å¤–ï¼‰å¹¶ä¸”ä¸ä¼šè¢«åæ‰æŒ‰ä¸‹äº‹ä»¶çš„æ‰ä¼šè§¦å‘
             //var _ = new DragMoveHelper(this.Content, this, winManager);
 
-            // 2. µÚ¶şÖÖ·½Ê½Ê¹ÓÃÏûÏ¢ÊÂ¼ş SC_MOVE HTCAPTION ÈÃËüÒÔÎªÔÚÒÆ¶¯´°¿Ú
+            // 2. ç¬¬äºŒç§æ–¹å¼ä½¿ç”¨æ¶ˆæ¯äº‹ä»¶ SC_MOVE HTCAPTION è®©å®ƒä»¥ä¸ºåœ¨ç§»åŠ¨çª—å£
             UIElement root = (UIElement)this.Content;
             root.PointerPressed += Root_PointerPressed;
             root.PointerReleased += Root_PointerReleased;
 
-            // 3. µÚÈıÖÖ·½·¨°ÑClientÇøÓòµ±×÷±êÌâÀ¸£¬ÕâÑù¾Í¿ÉÒÔÖ±½ÓÍÏ¶¯´°¿ÚÁË
+            // 3. ç¬¬ä¸‰ç§æ–¹æ³•æŠŠClientåŒºåŸŸå½“ä½œæ ‡é¢˜æ ï¼Œè¿™æ ·å°±å¯ä»¥ç›´æ¥æ‹–åŠ¨çª—å£äº†
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(this.Content);
-            //winManager.IsMaximizable = false;
-            //root.IsDoubleTapEnabled = false;
-            //this.AppWindow.TitleBar.SetDragRectangles([new RectInt32(0, 0, 220, 32)]);
-            // ¿ÉÒÔ¿¼ÂÇ hook ½ûÖ¹±êÌâÀ¸Ë«»÷·Å´ó WM_NCLBUTTONDBLCLK
+            // hook ç¦æ­¢æ ‡é¢˜æ åŒå‡»æ”¾å¤§ 
+            var monitor = new WindowMessageMonitor(this);
+            monitor.WindowMessageReceived += Monitor_WindowMessageReceived;
+
+            var process = Process.GetProcessesByName("notepad")[0];
+            //var process = Process.GetProcessById(14520);
+            var gameWindowHandle = process.MainWindowHandle;
+            var uiThread = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+            //process.Exited +=  (s, e) =>
+            //{
+            //    // è¿›ç¨‹ç»“æŸä¾èµ–æ¸¸æˆç»“æŸï¼ŸâŒåº”è¯¥ä¾èµ–äºçª—å£å…³é—­
+            //    uiThread.TryEnqueue(() => Microsoft.UI.Xaml.Application.Current.Exit());
+            //};
+            RemovePopupAddChildStyle(hwnd);
+            PInvoke.SetParent(new(hwnd), new(gameWindowHandle));
+            //PInvoke.GetClientRect(new(gameWindowHandle), out var rectClient);
+            //PInvoke.SetWindowPos(new(hwnd), HWND.Null, 0, 0, rectClient.Width, rectClient.Height, SET_WINDOW_POS_FLAGS.SWP_NOZORDER);
+            PInvoke.SetWindowPos(new(hwnd), HWND.Null, 0, 0, 220, 220, Windows.Win32.UI.WindowsAndMessaging.SET_WINDOW_POS_FLAGS.SWP_NOZORDER);
+        }
+
+        public static void RemovePopupAddChildStyle(nint hwnd)
+        {
+            var style = HwndExtensions.GetWindowStyle(hwnd);
+            style = style & ~WindowStyle.Popup | WindowStyle.Child;
+            HwndExtensions.SetWindowStyle(hwnd, style);
+        }
+
+        private void Monitor_WindowMessageReceived(object? sender, WindowMessageEventArgs e)
+        {
+            const int WM_NCLBUTTONDBLCLK = 0x00A3;
+            if (e.Message.MessageId == WM_NCLBUTTONDBLCLK)
+            {
+                e.Handled = true;
+            }
+            const int WM_CLOSE = 0x0010;
+            const int WM_Destory = 0x0002;
+            const int WM_NCDestory = 130;
+            if (e.Message.MessageId == WM_Destory)
+            {
+                Debug.WriteLine("WM_Destory");
+                Microsoft.UI.Xaml.Application.Current.Exit();
+            }
+            if (e.Message.MessageId == WM_NCDestory)
+            {
+                Debug.WriteLine("WM_NCDestory");
+            }
         }
 
         private void Root_PointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
@@ -64,7 +108,10 @@ namespace WASFramelessSample
         private void myButton_Click(object sender, RoutedEventArgs e)
         {
             //myButton.Content = "Clicked";
-            Close();
+            //Close();
+            //CoreApplication.Exit();
+            //Microsoft.UI.Xaml.Window.Current.Close();
+            Application.Current.Exit();
         }
 
         enum WindowsMessages : uint
@@ -74,7 +121,7 @@ namespace WASFramelessSample
         }
 
         /// <summary>
-        /// ÔÚ WAS ÖĞĞèÒªµã»÷Êó±ê£¬²¢ÇÒÊÍ·Åºó£¬µÚÒ»¸öÏûÏ¢²Å»á±»´¥·¢¡£µÚ¶ş´Îµã»÷Êó±ê£¬ÔÙÊÍ·Åºó£¬µÚ¶ş¸öÏûÏ¢ WM_LBUTTONUP ²Å»á±»´¥·¢¡£
+        /// åœ¨ WAS ä¸­éœ€è¦ç‚¹å‡»é¼ æ ‡ï¼Œå¹¶ä¸”é‡Šæ”¾åï¼Œç¬¬ä¸€ä¸ªæ¶ˆæ¯æ‰ä¼šè¢«è§¦å‘ã€‚ç¬¬äºŒæ¬¡ç‚¹å‡»é¼ æ ‡ï¼Œå†é‡Šæ”¾åï¼Œç¬¬äºŒä¸ªæ¶ˆæ¯ WM_LBUTTONUP æ‰ä¼šè¢«è§¦å‘ã€‚
         /// </summary>
         private void DragMove()
         {
@@ -90,7 +137,7 @@ namespace WASFramelessSample
         }
 
         /// <summary>
-        /// ¼ÆËãÎ»ÖÃÒÆ¶¯´°¿Ú£¬Ìå¸ĞÉÏĞ§ÂÊÃ»ÊÂ¼şºÃ£¨ĞèÒªÓÃÖ¡ÊıÈí¼şÑéÖ¤£©¡£cpuÕ¼ÓÃ×î¶àÖÁ%4 %5£¬±ÈÊÂ¼ş·½Ê½¶àÒ»±¶£¬GCÒ²»á×î¶àÆµ·±Ò»±¶£¨¸ßÑ¹Á¦ Ìõ¼şÏÂ£©¡£
+        /// è®¡ç®—ä½ç½®ç§»åŠ¨çª—å£ï¼Œä½“æ„Ÿä¸Šæ•ˆç‡æ²¡äº‹ä»¶å¥½ï¼ˆéœ€è¦ç”¨å¸§æ•°è½¯ä»¶éªŒè¯ï¼‰ã€‚cpuå ç”¨æœ€å¤šè‡³%4 %5ï¼Œæ¯”äº‹ä»¶æ–¹å¼å¤šä¸€å€ï¼ŒGCä¹Ÿä¼šæœ€å¤šé¢‘ç¹ä¸€å€ï¼ˆé«˜å‹åŠ› æ¡ä»¶ä¸‹ï¼‰ã€‚
         /// </summary>
         class DragMoveHelper
         {
@@ -111,7 +158,7 @@ namespace WASFramelessSample
                         sender.CapturePointer(e.Pointer);
                         initWindowX = winManager.AppWindow.Position.X;
                         initWindowY = winManager.AppWindow.Position.Y;
-                        PInvoke.GetCursorPos(out var pt); // pointerPoint.Position »ñÈ¡Êó±êÖ¸ÕëÎ»ÖÃ»áµ¼ÖÂÉÁË¸²»¶¨¡£
+                        PInvoke.GetCursorPos(out var pt); // pointerPoint.Position è·å–é¼ æ ‡æŒ‡é’ˆä½ç½®ä¼šå¯¼è‡´é—ªçƒä¸å®šã€‚
                         initCursorX = pt.X;
                         initCursorY = pt.Y;
                         moving = true;
